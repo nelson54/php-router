@@ -8,6 +8,7 @@ abstract class AbstractRoute {
 	private $tokens = [];
 	private $middleware = [];
 
+	//TODO instantiate $middleware as a MiddlewareList before passing it in...
 	public function __construct($middleware, $method, $path) {
 		$this->path = path;
 		$this-middleware = $middleware;
@@ -23,23 +24,17 @@ abstract class AbstractRoute {
 		if( empty($this->middleware) ) {
 			return $this->doRoute($request, $response, $params);
 		} else {
-			$mWchain = new ArrayIterator($this->middleware);
-
-			$next = function($params) use ($request, $response, $mwChain, $next) {
-				if($mwChain->isValid()) {
-					$middleware = $this->initMiddleware( $mwChain->current() );
-					$mwChain->next();
-
-					return $middleware->run($request, $response, $next, $params);
+			$this->middleware->reset();
+			
+			$next = function($params) use ($request, $response, $next) {
+				if( $this->middleware->valid() ) {
+					return $this->runNextMiddleware($request, $response, $next, $params);
 				} else {
 					return $this->doRoute($request, $response, $params);
 				}
 			};
 
-			$middleware = $this->initMiddleware( $mwChain->current() );
-			$mwChain->next();
-
-			return $middleware->run($request, $response, $next, $params);
+			return $this->runNextMiddleware($request, $response, $next, $params);
 		}
 	}
 
@@ -53,6 +48,13 @@ abstract class AbstractRoute {
 
 	protected abstract function initMiddleware($middleware);	
 
-	protected abstract function doRoute($request, $response, $params);
+	protected abstract function doRoute(RouteRequest $request, RouteResponse $response, $params);
+
+	private function runNextMiddleware($request, $response, $next, $params) {
+		$middleware = $this->middleware->current();
+		$this->middleware->next();
+
+		return $middleware->run($request, $response, $next, $params);
+	}
 }
 
